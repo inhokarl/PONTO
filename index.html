@@ -1,8 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <link rel="manifest" href="manifest.json" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Registro de Ponto</title>
@@ -30,7 +28,7 @@
       margin-top: 10px;
       display: block;
     }
-    input, button {
+    input, button, select {
       width: 100%;
       margin-top: 5px;
       padding: 10px;
@@ -57,7 +55,6 @@
       padding: 15px;
       margin-bottom: 10px;
       border-radius: 8px;
-      position: relative;
     }
     .registro small {
       color: #777;
@@ -85,15 +82,27 @@
       display: flex;
       gap: 10px;
     }
+    #tipoContainer {
+      display: none;
+      margin-top: 10px;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
   <div class="container">
     <h1>📅 Registro de Ponto</h1>
-
+    
     <label>Data</label>
-    <input type="date" id="data" />
+    <input type="date" id="data" onchange="mostrarTipo()" />
+
+    <div id="tipoContainer">
+      <label>Tipo de Dia</label>
+      <select id="tipo">
+        <option value="escala">Dia de Escala</option>
+        <option value="extra">Dia Extra</option>
+      </select>
+    </div>
 
     <label>Horário de Entrada</label>
     <input type="time" id="entrada" />
@@ -118,121 +127,129 @@
   <script>
     const { jsPDF } = window.jspdf;
 
-    const dataInput = document.getElementById("data");
-    const entradaInput = document.getElementById("entrada");
-    const saidaInput = document.getElementById("saida");
-    const fotoEntrada = document.getElementById("fotoEntrada");
-    const fotoSaida = document.getElementById("fotoSaida");
-    const registrosDiv = document.getElementById("registros");
+    document.addEventListener("DOMContentLoaded", () => {
+      const dataInput = document.getElementById("data");
+      const entradaInput = document.getElementById("entrada");
+      const saidaInput = document.getElementById("saida");
+      const fotoEntrada = document.getElementById("fotoEntrada");
+      const fotoSaida = document.getElementById("fotoSaida");
+      const tipoSelect = document.getElementById("tipo");
+      const registrosDiv = document.getElementById("registros");
+      const tipoContainer = document.getElementById("tipoContainer");
 
-    dataInput.valueAsDate = new Date();
+      if (dataInput.value) {
+        tipoContainer.style.display = "block";
+      }
 
-    function salvarRegistro() {
-      const data = dataInput.value;
-      const entrada = entradaInput.value;
-      const saida = saidaInput.value;
-      const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
-      const index = registros.findIndex(r => r.data === data);
-      let registro = index >= 0 ? registros[index] : { data };
-
-      const readerEntrada = new FileReader();
-      const readerSaida = new FileReader();
-
-      readerEntrada.onloadend = () => {
-        if (entrada) registro.entrada = entrada;
-        if (readerEntrada.result?.startsWith("data:image")) registro.imgEntrada = readerEntrada.result;
-
-        readerSaida.onloadend = () => {
-          if (saida) registro.saida = saida;
-          if (readerSaida.result?.startsWith("data:image")) registro.imgSaida = readerSaida.result;
-
-          if (index >= 0) registros[index] = registro;
-          else registros.push(registro);
-
-          localStorage.setItem("registrosPonto", JSON.stringify(registros));
-          entradaInput.value = "";
-          saidaInput.value = "";
-          fotoEntrada.value = "";
-          fotoSaida.value = "";
-          mostrarRegistros();
-        };
-
-        if (fotoSaida.files[0]) readerSaida.readAsDataURL(fotoSaida.files[0]);
-        else readerSaida.onloadend();
+      window.mostrarTipo = function () {
+        if (dataInput.value) {
+          tipoContainer.style.display = "block";
+        }
       };
 
-      if (fotoEntrada.files[0]) readerEntrada.readAsDataURL(fotoEntrada.files[0]);
-      else readerEntrada.onloadend();
-    }
+      window.salvarRegistro = function () {
+        const data = dataInput.value;
+        const entrada = entradaInput.value;
+        const saida = saidaInput.value;
+        const tipo = tipoSelect.value;
+        const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
+        const index = registros.findIndex(r => r.data === data);
+        let registro = index >= 0 ? registros[index] : { data };
 
-    function mostrarRegistros() {
-      registrosDiv.innerHTML = "";
-      const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]")
-        .sort((a,b)=> new Date(b.data) - new Date(a.data));
+        const readerEntrada = new FileReader();
+        const readerSaida = new FileReader();
 
-      registros.forEach((r, i) => {
-        const div = document.createElement("div");
-        div.className = "registro";
-        div.innerHTML = `
-          <div class="registro-header">
-            <div><strong>${formatarData(r.data)}</strong></div>
-            <button class="btn-danger" onclick="excluirRegistro('${r.data}')">Excluir</button>
-          </div>
-          <small>Entrada: ${r.entrada || '--'} ${r.imgEntrada ? '<br/><img src="'+r.imgEntrada+'" />' : ''}</small><br/>
-          <small>Saída: ${r.saida || '--'} ${r.imgSaida ? '<br/><img src="'+r.imgSaida+'" />' : ''}</small>
-        `;
-        registrosDiv.appendChild(div);
-      });
-    }
+        readerEntrada.onloadend = () => {
+          if (entrada) registro.entrada = entrada;
+          if (readerEntrada.result?.startsWith("data:image")) registro.imgEntrada = readerEntrada.result;
 
-    function excluirRegistro(data) {
-      if (!confirm("Deseja excluir este registro?")) return;
-      const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
-      const novos = registros.filter(r => r.data !== data);
-      localStorage.setItem("registrosPonto", JSON.stringify(novos));
+          readerSaida.onloadend = () => {
+            if (saida) registro.saida = saida;
+            if (readerSaida.result?.startsWith("data:image")) registro.imgSaida = readerSaida.result;
+            registro.tipo = tipo;
+
+            if (index >= 0) registros[index] = registro;
+            else registros.push(registro);
+
+            localStorage.setItem("registrosPonto", JSON.stringify(registros));
+            entradaInput.value = "";
+            saidaInput.value = "";
+            fotoEntrada.value = "";
+            fotoSaida.value = "";
+            mostrarRegistros();
+          };
+
+          if (fotoSaida.files[0]) readerSaida.readAsDataURL(fotoSaida.files[0]);
+          else readerSaida.onloadend();
+        };
+
+        if (fotoEntrada.files[0]) readerEntrada.readAsDataURL(fotoEntrada.files[0]);
+        else readerEntrada.onloadend();
+      };
+
+      window.mostrarRegistros = function () {
+        registrosDiv.innerHTML = "";
+        const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]")
+          .sort((a,b)=> new Date(b.data) - new Date(a.data));
+
+        registros.forEach((r) => {
+          const div = document.createElement("div");
+          div.className = "registro";
+          div.innerHTML = `
+            <div class="registro-header">
+              <div><strong>${formatarData(r.data)}</strong> - <em>${r.tipo === "extra" ? "Dia Extra" : "Escala"}</em></div>
+              <button class="btn-danger" onclick="excluirRegistro('${r.data}')">Excluir</button>
+            </div>
+            <small>Entrada: ${r.entrada || '--'} ${r.imgEntrada ? '<br/><img src="'+r.imgEntrada+'" />' : ''}</small><br/>
+            <small>Saída: ${r.saida || '--'} ${r.imgSaida ? '<br/><img src="'+r.imgSaida+'" />' : ''}</small>
+          `;
+          registrosDiv.appendChild(div);
+        });
+      };
+
+      window.excluirRegistro = function (data) {
+        if (!confirm("Deseja excluir este registro?")) return;
+        const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
+        const novos = registros.filter(r => r.data !== data);
+        localStorage.setItem("registrosPonto", JSON.stringify(novos));
+        mostrarRegistros();
+      };
+
+      window.confirmarLimpeza = function () {
+        if (!confirm("Tem certeza que deseja apagar todos os registros deste mês?")) return;
+        const hoje = new Date();
+        const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
+        const filtrados = registros.filter(r => {
+          const d = new Date(r.data);
+          return d.getMonth() !== hoje.getMonth() || d.getFullYear() !== hoje.getFullYear();
+        });
+        localStorage.setItem("registrosPonto", JSON.stringify(filtrados));
+        mostrarRegistros();
+      };
+
+      window.gerarPDF = function () {
+        const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
+        const doc = new jsPDF();
+
+        registros.forEach((r, i) => {
+          const y = 10 + i * 60;
+          doc.text(`Data: ${r.data} - ${r.tipo === "extra" ? "Dia Extra" : "Escala"}`, 10, y);
+          doc.text(`Entrada: ${r.entrada || '--'}`, 10, y+10);
+          if (r.imgEntrada) doc.addImage(r.imgEntrada, 'JPEG', 10, y+15, 30, 30);
+          doc.text(`Saída: ${r.saida || '--'}`, 80, y+10);
+          if (r.imgSaida) doc.addImage(r.imgSaida, 'JPEG', 80, y+15, 30, 30);
+        });
+
+        doc.save("registros.pdf");
+      };
+
+      function formatarData(str) {
+        const [y, m, d] = str.split("-");
+        return `${d}/${m}/${y}`;
+      }
+
       mostrarRegistros();
-    }
-
-    function confirmarLimpeza() {
-      if (!confirm("Tem certeza que deseja apagar todos os registros deste mês?")) return;
-      const hoje = new Date();
-      const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
-      const filtrados = registros.filter(r => {
-        const d = new Date(r.data);
-        return d.getMonth() !== hoje.getMonth() || d.getFullYear() !== hoje.getFullYear();
-      });
-      localStorage.setItem("registrosPonto", JSON.stringify(filtrados));
-      mostrarRegistros();
-    }
-
-    function gerarPDF() {
-      const registros = JSON.parse(localStorage.getItem("registrosPonto") || "[]");
-      const doc = new jsPDF();
-
-      registros.forEach((r, i) => {
-        const y = 10 + i * 60;
-        doc.text(`Data: ${r.data}`, 10, y);
-        doc.text(`Entrada: ${r.entrada || '--'}`, 10, y+10);
-        if (r.imgEntrada) doc.addImage(r.imgEntrada, 'JPEG', 10, y+15, 30, 30);
-        doc.text(`Saída: ${r.saida || '--'}`, 80, y+10);
-        if (r.imgSaida) doc.addImage(r.imgSaida, 'JPEG', 80, y+15, 30, 30);
-      });
-
-      doc.save("registros.pdf");
-    }
-
-    function formatarData(str) {
-      const [y, m, d] = str.split("-");
-      return `${d}/${m}/${y}`;
-    }
-
-    mostrarRegistros();
-  if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js')
-    .then(() => console.log('Service Worker registrado com sucesso'))
-    .catch(error => console.log('Erro ao registrar o Service Worker:', error));
-}
+    });
   </script>
-  
 </body>
 </html>
