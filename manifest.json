@@ -1,11 +1,11 @@
 {
   "name": "Registro de Ponto",
   "short_name": "Ponto",
-  "start_url": "index.html",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#eef2f8",
   "theme_color": "#4a6bff",
-  "description": "App para registrar ponto com imagem, entrada, saída e tipo de dia.",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
